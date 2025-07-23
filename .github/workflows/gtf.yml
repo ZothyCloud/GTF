@@ -2,45 +2,48 @@ name: Persistent 12-Hour SSH VM
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "0 */6 * * *"  # Every 6 hours
   workflow_dispatch:
 
 jobs:
   start-vm:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
-
+    timeout-minutes: 360  # 6 hours max
     steps:
-      - uses: actions/checkout@v3
 
-      - name: Restore Previous Files
-        run: |
-          mkdir -p ~/data
-          git clone --depth 1 --branch backup https://github.com/${{ github.repository }} restore || true
-          cp -r restore/data/* ~/data/ || true
+    - name: Checkout
+      uses: actions/checkout@v3
 
-      - name: Install Node & SSHX
-        run: |
-          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-          sudo apt-get install -y nodejs git
-          npm install -g sshx@1.1.0
+    - name: Restore Previous Files (from branch or artifacts)
+      run: |
+        mkdir -p restore
+        git config --global user.email "actions@github.com"
+        git config --global user.name "GitHub Actions"
+        git clone --depth 1 --single-branch --branch backup https://github.com/${{ github.repository }} restore || echo "No backup branch"
+        cp -r restore/data/* ~/ || echo "Nothing to restore"
 
-      - name: Start SSHX Session
-        run: |
-          sshx --once &
-          echo "🔗 SSHX Tunnel Started — session will persist until manually closed"
+    - name: Start SSHX Session
+      run: |
+        sudo apt update
+        sudo apt install -y nodejs npm
+        echo "Starting SSHX..."
+        npx sshx --idle
 
-      - name: Save Data Backup
-        if: always()
-        run: |
-          mkdir -p save/data
-          cp -r ~/data/* save/data/ || true
-          cd save
-          git init
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions"
-          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-          git checkout -B backup
-          git add .
-          git commit -m "Auto backup $(date)"
-          git push -f origin backup
+    - name: Save Home Directory to Repo
+      if: always()
+      run: |
+        mkdir -p save/data
+        if [ -d "$HOME/data" ]; then
+          cp -r "$HOME/data/"* save/data/
+        else
+          echo "No ~/data folder to back up"
+        fi
+        cd save
+        git init
+        git config --global user.email "actions@github.com"
+        git config --global user.name "GitHub Actions"
+        git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+        git checkout -B backup
+        git add .
+        git commit -m "Auto backup $(date)" || echo "Nothing to commit"
+        git push -f origin backup
