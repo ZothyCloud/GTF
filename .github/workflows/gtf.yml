@@ -22,8 +22,11 @@ jobs:
         git clone --depth 1 --single-branch --branch backup https://github.com/${{ github.repository }} restore || echo "No backup branch"
         cp -r restore/data/* ~/ || echo "Nothing to restore"
 
-    - name: Setup Tmate SSH
-      uses: mxschmitt/action-tmate@v3
+    - name: Start SSHX Session
+      run: |
+        sudo apt update
+        sudo apt install -y nodejs npm
+        npx sshx --once
 
     - name: Save Home Directory to Repo
       if: always()
@@ -38,6 +41,4 @@ jobs:
         git checkout -b backup
         git add .
         git commit -m "Auto backup $(date)"
-        git push -f origin backup 0 
-            0 
-              
+        git push -f origin backup
