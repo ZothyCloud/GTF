@@ -6,35 +6,46 @@ on:
 jobs:
   start-vm:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 720  # 12 hours
     steps:
-      - name: Setup
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up dependencies
         run: |
-          sudo apt update && sudo apt install -y npm nodejs
+          sudo apt update
+          sudo apt install -y curl npm
 
-      - name: Create VM Data Folder
-        run: mkdir -p save/data
-
-      - name: Initialize Git Backup
-        run: |
-          cd save
-          git init
-          git checkout -b backup
-          git config user.email "actions@github.com"
-          git config user.name "GitHub Actions"
-          touch .keep
-
-      - name: Start SSHX Tunnel
+      - name: Start SSHX session
         id: sshx
         run: |
-          sudo apt install -y curl
-          sshx_output=$(curl -sSf https://sshx.io/get | sh -s run --password yourpassword 2>&1)
+          npm install -g sshx
+          sshx_output=$(sshx run --password GTF123 --name "ZothyVM" || true)
           echo "$sshx_output"
-          echo "url=$(echo \"$sshx_output\" | grep -o 'https://sshx[^ ]*')" >> $GITHUB_OUTPUT
+          echo "url=$(echo "$sshx_output" | grep -o 'https://sshx[^ ]*')" >> $GITHUB_OUTPUT
 
-      - name: Notify Discord
+      - name: Send Discord Webhook
+        if: success()
         run: |
           curl -H "Content-Type: application/json" \
-            -X POST \
-            -d "{\"content\": \"🔓 **Your SSH tunnel is live!**\n${{ steps.sshx.outputs.url }}\n🛡️ Password: \`yourpassword\`\"}" \
-            ${{ secrets.DISCORD_WEBHOOK }}
+               -X POST \
+               -d "{\"content\": \"✅ SSHX VM started! Connect here: ${{ steps.sshx.outputs.url }}\"}" \
+               ${{ secrets.DISCORD_WEBHOOK }}
+
+      - name: Keep alive
+        run: sleep 43200  # 12 hours
+
+      - name: Backup data
+        run: |
+          mkdir -p save/data
+          if [ -d ~/data ]; then
+            cp -r ~/data/* save/data/ || true
+          fi
+          cd save
+          git init
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git checkout -b backup
+          git add .
+          git commit -m "Backup at $(date)"
+          git push -f https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} backup || true
