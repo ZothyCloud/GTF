@@ -6,42 +6,35 @@ on:
 jobs:
   start-vm:
     runs-on: ubuntu-latest
+
     steps:
+      - name: Setup
+        run: |
+          sudo apt update && sudo apt install -y npm nodejs
 
-    - name: Update system and install dependencies
-      run: |
-        sudo apt update && sudo apt install -y curl git
-        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-        sudo apt install -y nodejs
+      - name: Create VM Data Folder
+        run: mkdir -p save/data
 
-    - name: Start SSHX tunnel (12 hours)
-      id: start_sshx
-      run: |
-        echo "Installing SSHX..."
-        url=$(npx --yes sshx --idle 2>&1 | tee sshx_output.txt | grep -o 'https://sshx.*')
-        echo "SSHX_URL=$url" >> $GITHUB_ENV
+      - name: Initialize Git Backup
+        run: |
+          cd save
+          git init
+          git checkout -b backup
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          touch .keep
 
-    - name: Notify to Discord
-      if: env.SSHX_URL != ''
-      run: |
-        curl -H "Content-Type: application/json" \
-             -X POST \
-             -d "{\"content\": \"🔓 SSH VM started! Connect here: $SSHX_URL\"}" \
-             ${{ secrets.DISCORD_WEBHOOK }}
+      - name: Start SSHX Tunnel
+        id: sshx
+        run: |
+          sudo apt install -y curl
+          sshx_output=$(curl -sSf https://sshx.io/get | sh -s run --password yourpassword 2>&1)
+          echo "$sshx_output"
+          echo "url=$(echo \"$sshx_output\" | grep -o 'https://sshx[^ ]*')" >> $GITHUB_OUTPUT
 
-    - name: Save Home Directory to Repo
-      run: |
-        mkdir -p save/data
-        if [ -d "$HOME/data" ]; then
-          cp -r "$HOME/data/"* save/data/
-        else
-          echo "No ~/data folder to back up"
-        fi
-        cd save
-        git init
-        git config --global user.email "actions@github.com"
-        git config --global user.name "GitHub Actions"
-        git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-        git checkout -B backup
-        git add .
-        git diff --quiet && echo "No changes to commit" || (git commit -m "Auto backup $(date)" && git push -f origin backup)
+      - name: Notify Discord
+        run: |
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d "{\"content\": \"🔓 **Your SSH tunnel is live!**\n${{ steps.sshx.outputs.url }}\n🛡️ Password: \`yourpassword\`\"}" \
+            ${{ secrets.DISCORD_WEBHOOK }}
