@@ -1,4 +1,4 @@
-name: Persistent 12-Hour SSH VM
+name: Persistent 12‑Hour SSH VM
 
 on:
   workflow_dispatch:
@@ -6,46 +6,48 @@ on:
 jobs:
   start-vm:
     runs-on: ubuntu-latest
-    timeout-minutes: 720  # 12 hours
+    timeout-minutes: 720
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Set up dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y curl npm
+    - name: Install ttyd and Docker
+      run: |
+        sudo apt update
+        sudo apt install -y ttyd docker.io
 
-      - name: Start SSHX session
-        id: sshx
-        run: |
-          npm install -g sshx
-          sshx_output=$(sshx run --password GTF123 --name "ZothyVM" || true)
-          echo "$sshx_output"
-          echo "url=$(echo "$sshx_output" | grep -o 'https://sshx[^ ]*')" >> $GITHUB_OUTPUT
+    - name: Start Terminal Server
+      id: ttyd
+      run: |
+        docker run -d --name gtf-ttyd \
+          -p 7681:7681 \
+          alpine/sh -c "apk add --no-cache bash && ttyd -p 7681 bash"
+        url="http://localhost:7681"
+        echo "url=$url" >> $GITHUB_OUTPUT
 
-      - name: Send Discord Webhook
-        if: success()
-        run: |
-          curl -H "Content-Type: application/json" \
-               -X POST \
-               -d "{\"content\": \"✅ SSHX VM started! Connect here: ${{ steps.sshx.outputs.url }}\"}" \
-               ${{ secrets.DISCORD_WEBHOOK }}
+    - name: Send Discord Notification
+      if: success()
+      run: |
+        curl -H "Content-Type: application/json" \
+          -X POST \
+          -d "{\"content\": \"✅ VM terminal live! Access via: ${{ steps.ttyd.outputs.url }}\"}" \
+          ${{ secrets.DISCORD_WEBHOOK }}
 
-      - name: Keep alive
-        run: sleep 43200  # 12 hours
+    - name: Keep VM Alive
+      run: sleep 43200  # 12 hours
 
-      - name: Backup data
-        run: |
-          mkdir -p save/data
-          if [ -d ~/data ]; then
-            cp -r ~/data/* save/data/ || true
-          fi
-          cd save
-          git init
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git checkout -b backup
-          git add .
-          git commit -m "Backup at $(date)"
-          git push -f https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} backup || true
+    - name: Backup VM Data
+      run: |
+        mkdir -p save/data
+        if [ -d ~/data ]; then
+          cp -r ~/data/* save/data/ || true
+        fi
+        cd save
+        git init
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git checkout -b backup
+        git add .
+        git commit -m "Backup $(date)" || echo "No changes"
+        git push -f https://${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} backup
