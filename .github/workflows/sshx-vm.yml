@@ -14,7 +14,6 @@ jobs:
     - name: 🛰️ Install SSHX
       run: |
         curl -sL https://sshx.io/get | bash
-        chmod +x /usr/local/bin/sshx
 
     - name: 🚀 Launch SSHX VM
       run: |
