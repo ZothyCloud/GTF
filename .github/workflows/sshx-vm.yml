@@ -1,4 +1,4 @@
-name: Launch SSHX VM and persist disk
+name: sshx-vm
 
 on:
   workflow_dispatch:
@@ -6,29 +6,30 @@ on:
 jobs:
   sshx-vm:
     runs-on: ubuntu-latest
-
     steps:
-    - name: ⬇️ Install SSHX
-      run: |
-        curl -sL https://sshx.io/get | bash
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: 🚀 Launch SSHX VM
-      run: |
-        sshx --name ptero-vm --enable-readers &
-        sleep 15
+      - name: Install sshx
+        run: |
+          curl -sL https://sshx.io/get | bash
 
-    - name: 💾 Save VM Data to Branch
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-      run: |
-        git config --global user.name "Auto Backup"
-        git config --global user.email "actions@github.com"
+      - name: Start SSHX VM
+        run: |
+          nohup sshx --name ptero-vm --enable-readers &
+          sleep 15  # Give time for sshx to print the links
 
-        git remote set-url origin https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git
-        git fetch origin vm-data || true
-        git checkout -B vm-data
-        mkdir -p vmdata
-        echo "Backup at $(date)" >> vmdata/backup.txt
-        git add vmdata
-        git commit -m "💾 Backup VM data on $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
-        git push origin vm-data
+      - name: Configure Git
+        run: |
+          git config --global user.name "Auto Backup"
+          git config --global user.email "backup@auto.com"
+
+      - name: Save dummy VM data to branch
+        run: |
+          mkdir -p vmdata
+          echo "🗃️ VM backup at $(date)" > vmdata/backup.txt
+          git fetch
+          git switch vm-data || git checkout -b vm-data
+          git add vmdata/
+          git commit -m "💾 Backup VM data on $(date)" || echo "Nothing to commit"
+          git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }} vm-data
