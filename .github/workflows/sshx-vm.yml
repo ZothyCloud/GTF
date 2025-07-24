@@ -20,7 +20,8 @@ jobs:
 
       - name: 🚀 Start SSHX VM
         run: |
-          sshx run -n ptero-vm --disk ./vmdata --image "ubuntu:22.04" -- -p 80:80 -p 443:443 -p 3000:3000
+          sshx --name ptero-vm --disk ./vmdata --image ubuntu:22.04 \
+               --port 80:80 --port 443:443 --port 3000:3000
 
       - name: 💾 Save VM state to vm-data branch
         run: |
