@@ -16,24 +16,15 @@ jobs:
 
       - name: 🔓 Install sshx
         run: |
-          curl -sL https://sshx.io/get | bash || true
-          chmod +x sshx*
+          curl -sL https://sshx.io/get | bash
+          sshx --help
 
       - name: 🚀 Launch SSHX VM
         run: |
-          ./sshx* --name ptero-vm --enable-readers &
+          sshx --name ptero-vm --enable-readers &
           sleep 10
 
-      - name: 🐳 Install Docker in SSHX VM
-        run: |
-          docker run -dit --name ubuntu-vm \
-            -v ${{ github.workspace }}/vm-data:/data \
-            ubuntu:22.04 \
-            bash
-
-          echo "✅ Ubuntu container running. Use: docker exec -it ubuntu-vm bash"
-
-      - name: 💾 Save VM Data
+      - name: 💾 Save VM Data to Branch
         run: |
           git config --global user.name "Auto Backup"
           git config --global user.email "actions@github.com"
