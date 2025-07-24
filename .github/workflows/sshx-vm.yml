@@ -8,20 +8,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 🧰 Checkout Repository
-      uses: actions/checkout@v3
-
-    - name: 🛰️ Install SSHX
+    - name: ⬇️ Install SSHX
       run: |
         curl -sL https://sshx.io/get | bash
 
     - name: 🚀 Launch SSHX VM
       run: |
         sshx --name ptero-vm --enable-readers &
-        sleep 5
-
-    - name: 🕒 Wait for VM to be ready
-      run: sleep 15
+        sleep 15
 
     - name: 💾 Save VM Data to Branch
       env:
@@ -29,11 +23,12 @@ jobs:
       run: |
         git config --global user.name "Auto Backup"
         git config --global user.email "actions@github.com"
+
         git remote set-url origin https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git
         git fetch origin vm-data || true
         git checkout -B vm-data
         mkdir -p vmdata
-        echo "Test backup on $(date)" >> vmdata/backup.txt
+        echo "Backup at $(date)" >> vmdata/backup.txt
         git add vmdata
         git commit -m "💾 Backup VM data on $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
         git push origin vm-data
