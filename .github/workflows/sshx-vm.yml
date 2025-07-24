@@ -16,8 +16,9 @@ jobs:
 
       - name: Install sshx
         run: |
-          curl -sL https://sshx.io/get | bash
-          sudo mv sshx /usr/local/bin/
+          curl -sL https://sshx.io/get | tar -xz
+          sudo mv sshx*/sshx /usr/local/bin/sshx
+          sshx --version
 
       - name: Start SSHX VM with persistent disk
         run: |
