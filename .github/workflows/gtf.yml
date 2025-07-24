@@ -1,4 +1,4 @@
-name: Persistent 12‑Hour SSH VM
+name: Persistent 12-Hour SSH VM
 
 on:
   workflow_dispatch:
@@ -6,16 +6,15 @@ on:
 jobs:
   start-vm:
     runs-on: ubuntu-latest
-    timeout-minutes: 720  # 12 hours
+    timeout-minutes: 720
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Install Docker
+    - name: Install Docker (Safe Method)
       run: |
-        sudo apt-get update
-        sudo apt-get install -y docker.io
+        curl -fsSL https://get.docker.com | bash
         sudo systemctl start docker
         sudo systemctl enable docker
 
@@ -31,19 +30,22 @@ jobs:
     - name: Start Cloudflare Tunnel
       run: |
         cloudflared tunnel --url http://localhost:7681 --no-autoupdate > url.log &
-        sleep 5  # Give it time to generate the public URL
-        grep -o 'https://.*\.trycloudflare\.com' url.log > tunnel.txt
+        sleep 10
+        grep -o 'https://.*\.trycloudflare\.com' url.log > tunnel.txt || echo "No URL found"
         cat tunnel.txt
 
-    - name: Notify Discord with Tunnel URL
+    - name: Send Webhook Notification
       env:
         WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
       run: |
-        TUNNEL_URL=$(cat tunnel.txt)
+        TUNNEL_URL=$(cat tunnel.txt | head -n 1)
+        if [ -z "$TUNNEL_URL" ]; then
+          TUNNEL_URL="❌ Failed to fetch tunnel URL"
+        fi
         curl -H "Content-Type: application/json" \
           -X POST \
-          -d "{\"content\": \"🚀 Your Web Terminal is Live: $TUNNEL_URL\"}" \
+          -d "{\"content\": \"🔗 Terminal ready: $TUNNEL_URL\"}" \
           $WEBHOOK_URL
 
-    - name: Keep VM Alive
-      run: sleep 43200  # 12 hours
+    - name: Keep Alive for 12 Hours
+      run: sleep 43200
