@@ -1,4 +1,4 @@
-name: Launch SSHX VM and persist disk
+name: Launch SSHX VM
 
 on:
   workflow_dispatch:
@@ -8,20 +8,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - name: Checkout repo
+      uses: actions/checkout@v3
 
-      - name: Create vmdata folder
-        run: mkdir -p vmdata
+    - name: Create disk folder
+      run: mkdir -p vmdata
 
-      - name: Install sshx
-        run: |
-          curl -sL https://sshx.io/get | tar -xz
-          sudo mv sshx*/sshx /usr/local/bin/sshx
-          sshx --version
+    - name: Install sshx
+      run: |
+        curl -sL https://sshx.io/get -o sshx-install.sh
+        chmod +x sshx-install.sh
+        ./sshx-install.sh
+        sudo mv sshx*/sshx /usr/local/bin/sshx
+        sshx --version
 
-      - name: Start SSHX VM with persistent disk
-        run: |
-          sshx --name ptero-vm --enable-readers --shell bash --mount ./vmdata &
-          sleep 10
-          echo "✅ SSHX VM started — open the terminal link shown in the logs."
+    - name: Start SSHX VM
+      run: |
+        sshx --name ptero-vm --image ubuntu:22.04 --enable-readers &
+        sleep 10
+        echo "VM launched! You can now SSH into it using the provided link."
