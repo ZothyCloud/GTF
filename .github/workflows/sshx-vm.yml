@@ -8,27 +8,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 🧾 Checkout repository
+      - name: 🧾 Checkout repo
         uses: actions/checkout@v3
 
-      - name: 📦 Install sshx
-        run: |
-          curl -LO https://s3.amazonaws.com/sshx/sshx-x86_64-unknown-linux-musl.tar.gz
-          tar -xzf sshx-x86_64-unknown-linux-musl.tar.gz
-          sudo mv sshx /usr/local/bin/sshx
-          sudo chmod +x /usr/local/bin/sshx
+      - name: 📁 Create persistent data folder
+        run: mkdir -p vmdata
 
-      - name: 🚀 Start SSHX VM
+      - name: 🐳 Start Ubuntu VM inside Docker
         run: |
-          sshx --name ptero-vm --disk ./vmdata --image ubuntu:22.04 \
-               --port 80:80 --port 443:443 --port 3000:3000
+          docker run -dit --name ptero-vm \
+            -v ${{ github.workspace }}/vmdata:/vmdata \
+            -p 80:80 -p 443:443 -p 3000:3000 \
+            ubuntu:22.04 \
+            bash
 
-      - name: 💾 Save VM state to vm-data branch
+      - name: ⚙️ Install sshx in container
+        run: |
+          docker exec ptero-vm bash -c "apt update && apt install curl -y && \
+            curl -sL https://sshx.io/get | bash"
+
+      - name: 🚀 Start SSHX shell in container
+        run: |
+          docker exec -it ptero-vm bash -c "./sshx --shell bash --name ptero-vm"
+
+      - name: 💾 Save VM state to branch
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git fetch origin
           git checkout -B vm-data
           git add vmdata
-          git commit -m "Save VM state" || echo "Nothing to commit"
+          git commit -m 'Save VM state' || echo "Nothing to commit"
           git push origin vm-data --force
