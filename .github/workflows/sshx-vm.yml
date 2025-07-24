@@ -6,37 +6,45 @@ on:
 jobs:
   sshx-vm:
     runs-on: ubuntu-latest
-
     steps:
-      - name: 🧾 Checkout repo
-        uses: actions/checkout@v3
 
-      - name: 📁 Create persistent data folder
-        run: mkdir -p vmdata
+    - name: ⬇️ Checkout repo
+      uses: actions/checkout@v3
 
-      - name: 🐳 Start Ubuntu VM inside Docker
-        run: |
-          docker run -dit --name ptero-vm \
-            -v ${{ github.workspace }}/vmdata:/vmdata \
-            -p 80:80 -p 443:443 -p 3000:3000 \
-            ubuntu:22.04 \
-            bash
+    - name: 🐳 Install Docker (just in case)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y docker.io
 
-      - name: ⚙️ Install sshx in container
-        run: |
-          docker exec ptero-vm bash -c "apt update && apt install curl -y && \
-            curl -sL https://sshx.io/get | bash"
+    - name: 📦 Download and extract SSHX
+      run: |
+        curl -sL https://s3.amazonaws.com/sshx/sshx-x86_64-unknown-linux-musl.tar.gz -o sshx.tar.gz
+        tar -xzf sshx.tar.gz
+        chmod +x sshx
+        mv sshx /usr/local/bin/sshx
 
-      - name: 🚀 Start SSHX shell in container
-        run: |
-          docker exec -it ptero-vm bash -c "./sshx --shell bash --name ptero-vm"
+    - name: 🐳 Run Docker container for SSHX VM
+      run: |
+        docker run -d --name ptero-vm \
+          -v ${{ github.workspace }}/vmdata:/vmdata \
+          -p 80:80 -p 443:443 -p 3000:3000 \
+          ubuntu:22.04 sleep infinity
 
-      - name: 💾 Save VM state to branch
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git fetch origin
-          git checkout -B vm-data
-          git add vmdata
-          git commit -m 'Save VM state' || echo "Nothing to commit"
-          git push origin vm-data --force
+    - name: 📁 Copy SSHX into container
+      run: |
+        docker cp /usr/local/bin/sshx ptero-vm:/usr/local/bin/sshx
+        docker exec ptero-vm chmod +x /usr/local/bin/sshx
+
+    - name: 🚀 Start SSHX inside container
+      run: |
+        docker exec ptero-vm apt update && apt install -y script
+        docker exec ptero-vm script -q -c "sshx --shell bash --name ptero-vm"
+
+    - name: 💾 Save VM data to branch
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git checkout -B vm-data
+        git add vmdata
+        git commit -m "Save VM state" || echo "Nothing to commit"
+        git push origin vm-data --force
