@@ -1,55 +1,25 @@
 name: Persistent 12-Hour SSH VM
 
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"  # Every 6 hours
 
 jobs:
   start-vm:
     runs-on: ubuntu-latest
-    timeout-minutes: 720  # 12 hours
-
+    timeout-minutes: 360
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v3
 
-    - name: Install prerequisites
-      run: |
-        sudo apt update
-        sudo apt install -y curl wget docker.io
+      - name: Setup SSHX and Rclone
+        run: |
+          sudo apt update
+          sudo apt install -y curl unzip
+          curl -sSf https://sshx.io/get | sh -s run &
+          curl https://rclone.org/install.sh | sudo bash
+          echo "SSHX is running. Connect and run: rclone config"
 
-    - name: Install latest ttyd (Web Terminal)
-      run: |
-        LATEST=$(curl -s \
-          https://api.github.com/repos/tsl0922/ttyd/releases/latest \
-          | grep browser_download_url \
-          | grep linux_x86_64 \
-          | cut -d '"' -f 4)
-        wget "$LATEST" -O ttyd.tar.gz
-        tar -xzf ttyd.tar.gz && sudo mv ttyd /usr/local/bin/
-
-    - name: Start ttyd on port 7681
-      run: |
-        nohup ttyd -p 7681 bash &
-
-    - name: Install Cloudflared
-      run: |
-        wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-        sudo dpkg -i cloudflared-linux-amd64.deb
-
-    - name: Launch Cloudflare Tunnel & capture URL
-      run: |
-        nohup cloudflared tunnel --url http://localhost:7681 --no-autoupdate > url.log 2>&1 &
-        sleep 10
-        grep -o 'https://[a-zA-Z0-9.-]*\.trycloudflare\.com' url.log | head -n 1 > tunnel.txt
-
-    - name: Notify Discord with your web terminal URL
-      env:
-        WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
-      run: |
-        URL=$(cat tunnel.txt || echo "Failed to retrieve URL")
-        curl -H "Content-Type: application/json" \
-             -X POST \
-             -d "{\"content\":\"🚀 Your terminal is ready: $URL\"}" \
-             "$WEBHOOK_URL"
-
-    - name: Keep runner alive for 12 hours
-      run: sleep 43200
+      - name: Sleep
+        run: sleep 43200  # Keeps job alive for 12 hours
