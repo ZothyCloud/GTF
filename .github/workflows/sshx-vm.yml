@@ -8,22 +8,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
+    - name: Checkout repository
       uses: actions/checkout@v3
 
     - name: Create disk folder
       run: mkdir -p vmdata
 
-    - name: Install sshx
+    - name: Download and install sshx
       run: |
-        curl -sL https://sshx.io/get -o sshx-install.sh
-        chmod +x sshx-install.sh
-        ./sshx-install.sh
-        sudo mv sshx*/sshx /usr/local/bin/sshx
+        curl -L https://s3.amazonaws.com/sshx/sshx-x86_64-unknown-linux-musl.tar.gz -o sshx.tar.gz
+        mkdir sshx-bin
+        tar -xzf sshx.tar.gz -C sshx-bin
+        sudo mv sshx-bin/sshx /usr/local/bin/sshx
         sshx --version
 
     - name: Start SSHX VM
       run: |
         sshx --name ptero-vm --image ubuntu:22.04 --enable-readers &
-        sleep 10
-        echo "VM launched! You can now SSH into it using the provided link."
+        sleep 15
+        echo "✅ VM launched. Open the SSHX link in your terminal output!"
