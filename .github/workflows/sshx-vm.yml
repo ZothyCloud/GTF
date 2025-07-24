@@ -6,6 +6,7 @@ on:
 jobs:
   sshx-vm:
     runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours max on GitHub-hosted runners
 
     steps:
       - name: Checkout repo
@@ -22,7 +23,13 @@ jobs:
       - name: Launch SSHX VM
         run: |
           sshx --name ptero-vm --enable-readers &
-          sleep 15
+          sleep 10
+
+      - name: Keep the VM active (max 6 hours)
+        run: |
+          echo "✅ SSHX VM launched!"
+          echo "⏳ Keeping the VM alive for 6 hours (max GitHub timeout)..."
+          sleep 21600  # 6 hours = 6*60*60 = 21600 seconds
 
       - name: Backup VM data to vm-data branch
         run: |
