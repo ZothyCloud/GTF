@@ -1,0 +1,35 @@
+name: Launch SSHX VM and persist disk
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sshx-vm:
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: ⬇️ Checkout Repo
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Needed to access branches
+
+    - name: 📁 Create VM image directory
+      run: |
+        mkdir -p vmdata
+        git fetch origin vm-data || echo "No previous branch"
+        git checkout vm-data -- vmdata || echo "No vmdata to restore"
+
+    - name: 🚀 Start SSHX VM with persistent disk
+      run: |
+        curl -sL https://sshx.io/get | bash
+        ./sshx run -n my-ptero-vm --disk ./vmdata --image "ubuntu:22.04" -- -p 3000:3000 -p 80:80 -p 443:443
+
+    - name: 📤 Commit VM Data to Branch
+      if: always()
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git checkout -B vm-data
+        git add vmdata
+        git commit -m "Save VM state" || echo "Nothing to commit"
+        git push origin vm-data --force
